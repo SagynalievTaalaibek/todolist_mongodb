@@ -26,3 +26,11 @@ export interface TaskMutation {
   description: string;
   status: string;
 }
+
+export interface TaskI {
+  id: string;
+  user: Types.ObjectId;
+  title: string;
+  description: string;
+  status: string;
+}

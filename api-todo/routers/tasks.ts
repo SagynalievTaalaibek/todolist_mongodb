@@ -44,9 +44,44 @@ tasksRouter.get('/', auth, async (req: RequestWithUser, res, next) => {
       return res.status(404).send({ error: 'Wrong ObjectId!' });
     }
 
-    const task = await Task.find({ user: _id });
-    res.send(task);
+    const tasks = await Task.find({ user: _id });
+    res.send(tasks);
   } catch (e) {
+    next(e);
+  }
+});
+
+tasksRouter.put('/:id', auth, async (req: RequestWithUser, res, next) => {
+  try {
+    const id = req.params.id;
+
+    let _id: Types.ObjectId;
+    try {
+      _id = new Types.ObjectId(req.user?._id);
+    } catch {
+      return res.status(404).send({ error: 'Wrong ObjectId!' });
+    }
+
+    const task = await Task.findById(id);
+
+    if (!task) {
+      return res.status(404).send({ error: 'Task not found!' });
+    }
+
+    if (!task.user.equals(_id)) {
+      return res.status(403).send({ error: 'You cannot change this task' });
+    }
+
+    task.title = req.body.title || task.title;
+    task.description = req.body.description || task.description;
+    task.status = req.body.status || task.status;
+
+    const updatedTask = await task.save();
+    res.send(updatedTask);
+  } catch (e) {
+    if (e instanceof mongoose.Error.ValidationError) {
+      return res.status(422).send(e);
+    }
     next(e);
   }
 });
