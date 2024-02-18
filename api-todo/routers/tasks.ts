@@ -34,4 +34,21 @@ tasksRouter.post('/', auth, async (req: RequestWithUser, res, next) => {
     next(e);
   }
 });
+
+tasksRouter.get('/', auth, async (req: RequestWithUser, res, next) => {
+  try {
+    let _id: Types.ObjectId;
+    try {
+      _id = new Types.ObjectId(req.user?._id);
+    } catch {
+      return res.status(404).send({ error: 'Wrong ObjectId!' });
+    }
+
+    const task = await Task.find({ user: _id });
+    res.send(task);
+  } catch (e) {
+    next(e);
+  }
+});
+
 export default tasksRouter;
