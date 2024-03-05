@@ -1,28 +1,18 @@
 import express from 'express';
-import mongoose, { Types } from 'mongoose';
+import mongoose from 'mongoose';
 import auth, { RequestWithUser } from '../middleware/auth';
 import Task from '../models/Task';
-import { TaskMutation } from '../types';
 
 const tasksRouter = express.Router();
 
 tasksRouter.post('/', auth, async (req: RequestWithUser, res, next) => {
   try {
-    let _id: Types.ObjectId;
-    try {
-      _id = new Types.ObjectId(req.user?._id);
-    } catch {
-      return res.status(404).send({ error: 'Wrong ObjectId!' });
-    }
-
-    const taskData: TaskMutation = {
-      user: _id,
+    const task = new Task({
+      user: req.user?._id,
       title: req.body.title,
       description: req.body.description,
       status: req.body.status,
-    };
-
-    const task = new Task(taskData);
+    });
     await task.save();
 
     res.send(task);
@@ -37,14 +27,10 @@ tasksRouter.post('/', auth, async (req: RequestWithUser, res, next) => {
 
 tasksRouter.get('/', auth, async (req: RequestWithUser, res, next) => {
   try {
-    let _id: Types.ObjectId;
-    try {
-      _id = new Types.ObjectId(req.user?._id);
-    } catch {
-      return res.status(404).send({ error: 'Wrong ObjectId!' });
-    }
-
-    const tasks = await Task.find({ user: _id });
+    const tasks = await Task.find({ user: req.user?._id }).populate('user', [
+      'token',
+      'username',
+    ]);
     res.send(tasks);
   } catch (e) {
     next(e);
@@ -55,20 +41,34 @@ tasksRouter.put('/:id', auth, async (req: RequestWithUser, res, next) => {
   try {
     const id = req.params.id;
 
-    let _id: Types.ObjectId;
-    try {
-      _id = new Types.ObjectId(req.user?._id);
-    } catch {
-      return res.status(404).send({ error: 'Wrong ObjectId!' });
-    }
-
     const task = await Task.findById(id);
 
     if (!task) {
       return res.status(404).send({ error: 'Task not found!' });
     }
 
-    if (!task.user.equals(_id)) {
+    const newTask = await Task.updateOne(
+      {
+        _id: id,
+        user: req.user?._id,
+      },
+      {
+        title: req.body.title,
+        description: req.body.description ?? null,
+        status: req.body.status,
+      },
+      {
+        runValidators: true,
+      },
+    );
+
+    if (newTask.modifiedCount === 0) {
+      res.status(403).send({ message: 'Some error in update task!' });
+    }
+
+    res.send(newTask);
+
+    /*if (!task.user.equals(req.user?._id)) {
       return res.status(403).send({ error: 'You cannot change this task' });
     }
 
@@ -77,7 +77,7 @@ tasksRouter.put('/:id', auth, async (req: RequestWithUser, res, next) => {
     task.status = req.body.status || task.status;
 
     const updatedTask = await task.save();
-    res.send(updatedTask);
+    res.send(updatedTask);*/
   } catch (e) {
     if (e instanceof mongoose.Error.ValidationError) {
       return res.status(422).send(e);
@@ -90,25 +90,28 @@ tasksRouter.delete('/:id', auth, async (req: RequestWithUser, res, next) => {
   try {
     const taskId = req.params.id;
 
-    let _id: Types.ObjectId;
-    try {
-      _id = new Types.ObjectId(req.user?._id);
-    } catch {
-      return res.status(404).send({ error: 'Wrong ObjectId!' });
-    }
-
-    const task = await Task.findById(taskId);
+    /* const task = await Task.findById(taskId);
 
     if (!task) {
       return res.status(404).send({ error: 'Task not found!' });
     }
 
-    if (!task.user.equals(_id)) {
+    if (!task.user.equals(req.user?._id)) {
       return res.status(403).send({ error: 'You cannot delete this task' });
     }
 
-    await Task.deleteOne({ _id: taskId });
-    return res.status(200).send({ message: `Task delete id = ${taskId}` });
+    await Task.deleteOne({ _id: taskId });*/
+
+    const result = await Task.findOneAndDelete({
+      _id: taskId,
+      user: req.user?._id,
+    });
+
+    if (!result) {
+      return res.status(403).send({ message: 'Some error in delete' });
+    }
+
+    return res.send({ message: `Task delete id = ${taskId}` });
   } catch (e) {
     next(e);
   }

@@ -18,11 +18,15 @@ const TaskSchema = new Schema({
     type: String,
     required: true,
   },
-  description: String,
+  description: {
+    type: String,
+    default: null,
+  },
   status: {
     type: String,
     enum: ['new', 'in_progress', 'complete'],
     default: 'new',
+    message: 'Status is not correct!',
   },
 });
 
